@@ -1,1 +1,1 @@
-# pow-blockchain-proto
+# Proof of Work - Blockchain
