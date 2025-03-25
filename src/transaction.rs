@@ -1,12 +1,15 @@
+#[derive(Debug)]
 pub struct Transaction {
     pub inputs: Vec<TxInput>,
     pub outputs: Vec<TxOutput>,
 }
 
+#[derive(Debug)]
 pub struct TxInput {
     pub previous_output: String,
 }
 
+#[derive(Debug)]
 pub struct TxOutput {
     pub recipient: String,
     pub amount: u64,
