@@ -1,37 +1,63 @@
-#[derive(Debug)]
+use chrono::Utc;
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
+use crate::{coin::ECoin, wallet::{self, Wallet}};
+
+// #[derive(Debug, Serialize, Deserialize, Clone)]
+// Ecoin is UTXO
+#[derive(Serialize, Deserialize)]
 pub struct Transaction {
-    pub inputs: Vec<TxInput>,
-    pub outputs: Vec<TxOutput>,
-}
-
-#[derive(Debug)]
-pub struct TxInput {
-    pub previous_output: String,
-}
-
-#[derive(Debug)]
-pub struct TxOutput {
-    pub recipient: String,
-    pub amount: u64,
+    pub inputs: Vec<ECoin>,
+    pub outputs: Vec<ECoin>,
+    pub id: [u8; 32],
 }
 
 impl Transaction {
-    pub fn new(inputs: Vec<TxInput>, outputs: Vec<TxOutput>) -> Self {
-        Transaction { inputs, outputs }
+    pub fn transact(from_wallet: Wallet, to_wallet: Wallet, inputs: Vec<ECoin>, value: u64) -> Self {
+        let miner_fee: u64 = 1;
+        let total_input: u64 = inputs.iter().map(|coin| coin.value).sum();
+        let id = Transaction::generate_id();
+
+        // Change ECoin (UTXO)
+        let change_val = total_input - value - miner_fee;
+        let change_hash = ECoin::hash_coin(from_wallet.public_key, id);
+        let change = ECoin {
+            curr_owner: from_wallet.public_key,
+            prev_tx: id,
+            hash: ECoin::hash_coin(from_wallet.public_key, id),
+            signature: ECoin::sign_coin(&from_wallet, change_hash),
+            value: change_val
+        };
+
+        // Receiver ECoin (UTXO)
+        let output_val = value;
+        let output_hash = ECoin::hash_coin(to_wallet.public_key, id);
+        let output = ECoin {
+            curr_owner: to_wallet.public_key,
+            prev_tx: id,
+            hash: ECoin::hash_coin(to_wallet.public_key, id),
+            signature: ECoin::sign_coin(&from_wallet, output_hash),
+            value: output_val,
+        };
+
+        // Outputs ECoin
+        let outputs = vec![change, output];
+
+        println!("{} ECoins transferred from {} to {}.", output_val, from_wallet.get_address(), to_wallet.get_address());
+        // Transaction
+        Transaction { inputs, outputs, id }
     }
 
-    pub fn new_coinbase(miner_address: String, reward: u64) -> Self {
-        Transaction {
-            inputs: vec![],
-            outputs: vec![TxOutput{
-                recipient: miner_address,
-                amount: reward,
-            }]
-        }
-    }
+    pub fn generate_id() -> [u8; 32] {
+        let mut hasher = Sha256::new();
 
-    pub fn calculate_fee(&self, input_total: u64) -> u64 {
-        let output_total: u64 = self.outputs.iter().map(|o| o.amount).sum();
-        input_total.saturating_sub(output_total)
+        let timestamp_opt = Utc::now().timestamp_nanos_opt();
+        let timestamp = timestamp_opt.unwrap_or(0);
+        hasher.update(timestamp.to_be_bytes());
+
+        let result = hasher.finalize();
+        let mut id = [0u8; 32];
+        id.copy_from_slice(&result);
+        id
     }
 }
