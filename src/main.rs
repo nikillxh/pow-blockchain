@@ -1,53 +1,44 @@
-use std::{io, sync::{Arc, Mutex}};
-
-mod block;
-mod transaction;
-mod blockchain;
 mod wallet;
-mod network;
+mod transaction;
 mod coin;
+mod block;
+mod blockchain;
+mod network;
 
-
-use std::{error::Error, time::Duration};
-
-use futures::prelude::*;
-use libp2p::{futures, noise, ping, swarm::SwarmEvent, tcp, yamux, Multiaddr};
+use std::{
+    collections::hash_map::DefaultHasher,
+    error::Error,
+    hash::{Hash, Hasher},
+    time::Duration,
+};
+use futures::{stream::StreamExt};
+use libp2p::{
+    gossipsub, mdns, noise,
+    swarm::{NetworkBehaviour, SwarmEvent},
+    tcp, yamux,
+};
+use network::{task1, task2};
+use tokio::{io, select, sync::mpsc, task, time};
 use tracing_subscriber::EnvFilter;
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn Error>> {
-    let _ = tracing_subscriber::fmt()
-        .with_env_filter(EnvFilter::from_default_env())
-        .try_init();
+async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
+    // Create a channel for task2 to send messages to task1
+    let (tx, rx) = mpsc::channel::<String>(100);
+    
+    // Spawn both tasks with communication channel
+    let t1 = task::spawn(task1(rx));
+    let t2 = task::spawn(task2(tx));
 
-    let mut swarm = libp2p::SwarmBuilder::with_new_identity()
-        .with_tokio()
-        .with_tcp(
-            tcp::Config::default(),
-            noise::Config::new,
-            yamux::Config::default,
-        )?
-        .with_behaviour(|_| ping::Behaviour::default())?
-        .with_swarm_config(|cfg| cfg.with_idle_connection_timeout(Duration::from_secs(u64::MAX)))
-        .build();
-
-    // Tell the swarm to listen on all interfaces and a random, OS-assigned
-    // port.
-    swarm.listen_on("/ip4/0.0.0.0/tcp/0".parse()?)?;
-
-    // Dial the peer identified by the multi-address given as the second
-    // command-line argument, if any.
-    if let Some(addr) = std::env::args().nth(1) {
-        let remote: Multiaddr = addr.parse()?;
-        swarm.dial(remote)?;
-        println!("Dialed {addr}")
-    }
-
-    loop {
-        match swarm.select_next_some().await {
-            SwarmEvent::NewListenAddr { address, .. } => println!("Listening on {address:?}"),
-            SwarmEvent::Behaviour(event) => println!("{event:?}"),
-            _ => {}
+    // Wait for tasks to complete (they won't normally complete unless there's an error)
+    let results = futures::future::join_all(vec![t1, t2]).await;
+    
+    // Report any errors from tasks
+    for (i, result) in results.into_iter().enumerate() {
+        if let Err(e) = result {
+            println!("Task {} failed with error: {:?}", i+1, e);
         }
     }
+
+    Ok(())
 }

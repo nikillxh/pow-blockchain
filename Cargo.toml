@@ -10,6 +10,8 @@ serde = {version = "1.0.219", features = ["derive"]}
 serde_json = {version = "1.0.140"}
 chrono = {version = "0.4.40"}
 hex = {version = "0.4.3"}
-libp2p = {version = "0.55.0", features = ["noise", "ping", "tcp", "tokio", "yamux"]}
+libp2p = {version = "0.55.0", features = ["noise", "ping", "tcp", "tokio", "yamux", "mdns", "gossipsub", "quic", "macros"]}
 tracing-subscriber = {version = "0.3.19", features = ["env-filter"]}
 tokio = {version = "1.44.1", features = ["full"]}
+futures = {version = "0.3.31"}
+rand = "0.8"
