@@ -1,8 +1,5 @@
 use std::{
-    collections::hash_map::DefaultHasher,
-    error::Error,
-    hash::{Hash, Hasher},
-    time::Duration,
+    collections::hash_map::DefaultHasher, error::Error, hash::{Hash, Hasher}, sync::{Arc, Mutex}, time::Duration
 };
 use futures::{stream::StreamExt};
 use libp2p::{
@@ -13,7 +10,7 @@ use libp2p::{
 use tokio::{io, select, sync::mpsc, task, time};
 use tracing_subscriber::EnvFilter;
 
-use crate::wallet::Wallet;
+use crate::{communication::Broadcast, wallet::Wallet};
 
 // A custom network behaviour that combines Gossipsub and Mdns.
 #[derive(NetworkBehaviour)]
@@ -22,7 +19,7 @@ struct MyBehaviour {
     mdns: mdns::tokio::Behaviour,
 }
 
-pub async fn task1(wallet: Wallet, mut message_receiver: mpsc::Receiver<String>) -> Result<(), Box<dyn Error + Send + Sync>> {
+pub async fn task1(walletb: &Arc<Mutex<Broadcast>>, message_receiver: &mut mpsc::Receiver<String>) -> Result<(), Box<dyn Error + Send + Sync>> {
     let _ = tracing_subscriber::fmt()
     .with_env_filter(EnvFilter::from_default_env())
     .try_init();
@@ -117,7 +114,7 @@ pub async fn task1(wallet: Wallet, mut message_receiver: mpsc::Receiver<String>)
     }
 }
 
-pub async fn task2(message_sender: mpsc::Sender<String>) -> Result<(), Box<dyn Error + Send + Sync>> {
+pub async fn task2(walletb: &Arc<Mutex<Broadcast>>, message_sender: mpsc::Sender<String>) -> Result<(), Box<dyn Error + Send + Sync>> {
     let mut counter = 1;
     
     loop {

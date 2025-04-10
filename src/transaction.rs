@@ -2,7 +2,7 @@ use chrono::Utc;
 use libp2p::{swarm::NetworkBehaviour, Swarm};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use crate::{coin::ECoin, network::Network, wallet::Wallet};
+use crate::{coin::ECoin, wallet::Wallet};
 
 // #[derive(Debug, Serialize, Deserialize, Clone)]
 // Ecoin is UTXO
